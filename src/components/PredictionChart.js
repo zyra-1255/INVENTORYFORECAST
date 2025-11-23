@@ -5,11 +5,9 @@ const PredictionChart = ({ products, predictions }) => {
     return <div className="chart-loading">Loading chart data...</div>;
   }
 
-  // Calculate data for charts
   const reorderData = Object.values(predictions).filter(p => p.shouldReorder).length;
   const okData = products.length - reorderData;
 
-  // Risk level analysis
   const riskLevels = products.reduce((acc, product) => {
     const weeksOfSupply = product.currentInventory / (product.averageSales / 7);
     const requiredWeeks = product.leadTime / 7;
@@ -21,20 +19,10 @@ const PredictionChart = ({ products, predictions }) => {
     return { ...acc, low: acc.low + 1 };
   }, { critical: 0, high: 0, medium: 0, low: 0 });
 
-  // Category analysis
-  const categories = products.reduce((acc, product) => {
-    const category = product.category || 'Uncategorized';
-    if (!acc[category]) acc[category] = 0;
-    acc[category]++;
-    return acc;
-  }, {});
-
   return (
-    <div className="prediction-charts">
-      <h3>📊 Analytics & Predictions</h3>
-      
+    <section className="section">
+      <h2 className="section-title">Analytics & Predictions</h2>
       <div className="charts-grid">
-        {/* Reorder Status Chart */}
         <div className="chart-card">
           <h4>Reorder Status</h4>
           <div className="chart-container">
@@ -51,7 +39,6 @@ const PredictionChart = ({ products, predictions }) => {
           </div>
         </div>
 
-        {/* Risk Level Chart */}
         <div className="chart-card">
           <h4>Risk Levels</h4>
           <div className="risk-bars">
@@ -73,78 +60,8 @@ const PredictionChart = ({ products, predictions }) => {
             </div>
           </div>
         </div>
-
-        {/* Category Distribution */}
-        <div className="chart-card">
-          <h4>Categories</h4>
-          <div className="category-list">
-            {Object.entries(categories).map(([category, count]) => (
-              <div key={category} className="category-item">
-                <span className="category-name">{category}</span>
-                <span className="category-count">{count}</span>
-                <div className="category-bar" style={{width: `${(count / products.length) * 100}%`}}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Prediction Confidence */}
-        <div className="chart-card">
-          <h4>AI Confidence</h4>
-          <div className="confidence-stats">
-            <div className="confidence-item">
-              <span>High Confidence (&gt;80%)</span>
-              <span>
-                {Object.values(predictions).filter(p => p.confidence > 0.8).length}
-              </span>
-            </div>
-            <div className="confidence-item">
-              <span>Medium Confidence (50-80%)</span>
-              <span>
-                {Object.values(predictions).filter(p => p.confidence > 0.5 && p.confidence <= 0.8).length}
-              </span>
-            </div>
-            <div className="confidence-item">
-              <span>Low Confidence (&lt;50%)</span>
-              <span>
-                {Object.values(predictions).filter(p => p.confidence <= 0.5).length}
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
-
-      {/* Summary Statistics */}
-      <div className="summary-stats">
-        <h4>Key Metrics</h4>
-        <div className="metrics-grid">
-          <div className="metric">
-            <span className="metric-label">Avg Inventory</span>
-            <span className="metric-value">
-              {Math.round(products.reduce((sum, p) => sum + p.currentInventory, 0) / products.length)}
-            </span>
-          </div>
-          <div className="metric">
-            <span className="metric-label">Avg Sales/Week</span>
-            <span className="metric-value">
-              {Math.round(products.reduce((sum, p) => sum + p.averageSales, 0) / products.length)}
-            </span>
-          </div>
-          <div className="metric">
-            <span className="metric-label">Avg Lead Time</span>
-            <span className="metric-value">
-              {Math.round(products.reduce((sum, p) => sum + p.leadTime, 0) / products.length)} days
-            </span>
-          </div>
-          <div className="metric">
-            <span className="metric-label">Reorder Rate</span>
-            <span className="metric-value">
-              {((reorderData / products.length) * 100).toFixed(1)}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };
 

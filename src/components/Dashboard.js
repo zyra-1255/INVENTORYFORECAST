@@ -11,8 +11,8 @@ const Dashboard = ({ products, predictions }) => {
   }).length;
 
   return (
-    <div className="dashboard">
-      <h2>Inventory Dashboard</h2>
+    <section className="section">
+      <h2 className="section-title">Inventory Dashboard</h2>
       
       <div className="stats-grid">
         <div className="stat-card total">
@@ -37,16 +37,7 @@ const Dashboard = ({ products, predictions }) => {
           <p className="stat-number">{highRiskProducts}</p>
         </div>
       </div>
-
-      <div className="summary">
-        <h4>Quick Actions</h4>
-        <div className="action-buttons">
-          <button className="btn-primary">Generate Reorder List</button>
-          <button className="btn-secondary">Export Report</button>
-          <button className="btn-warning">Alert Critical Items</button>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };
 

@@ -6,8 +6,8 @@ const ProductTable = ({ products, predictions, loading }) => {
   }
 
   return (
-    <div className="product-table">
-      <h3>Product Inventory & Predictions</h3>
+    <section className="section">
+      <h2 className="section-title">Product Inventory & Predictions</h2>
       <div className="table-container">
         <table>
           <thead>
@@ -24,7 +24,8 @@ const ProductTable = ({ products, predictions, loading }) => {
           <tbody>
             {products.map((product, index) => {
               const prediction = predictions[product.id];
-              const riskLevel = product.currentInventory / (product.averageSales / 7) < product.leadTime / 7 ? 'High' : 'Low';
+              const weeksOfSupply = product.currentInventory / (product.averageSales / 7);
+              const riskLevel = weeksOfSupply < product.leadTime / 7 ? 'High' : 'Low';
               
               return (
                 <tr key={product.id} className={prediction?.shouldReorder ? 'reorder-row' : ''}>
@@ -51,7 +52,7 @@ const ProductTable = ({ products, predictions, loading }) => {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 };
 

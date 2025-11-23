@@ -87,15 +87,15 @@ export class InventoryPredictor {
     return {
       probability: value,
       shouldReorder: value > 0.5,
-      confidence: Math.abs(value - 0.5) * 2 // Convert to 0-1 scale
+      confidence: Math.abs(value - 0.5) * 2
     };
   }
 
-  // Rule-based fallback (if model fails)
+  // Rule-based fallback
   shouldReorder(product) {
     const weeksOfSupply = product.currentInventory / (product.averageSales / 7);
     const requiredWeeks = product.leadTime / 7;
     
-    return weeksOfSupply <= requiredWeeks * 1.5; // 1.5x safety buffer
+    return weeksOfSupply <= requiredWeeks * 1.5;
   }
 }
