@@ -1,186 +1,135 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { InventoryPredictor } from './utils/predictionModel';
+import Dashboard from './components/Dashboard';
+import ProductTable from './components/ProductTable';
+import PredictionChart from './components/PredictionChart';
 import './App.css';
 
 function App() {
   const [products, setProducts] = useState([]);
+  const [predictions, setPredictions] = useState({});
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ total: 0, reorder: 0, ok: 0 });
+  const [training, setTraining] = useState(false);
+  const [error, setError] = useState(null);
+  const [predictor] = useState(new InventoryPredictor());
 
-  // Generate 100+ products with realistic data
-  const generateProducts = () => {
-    const categories = [
-      'Electronics', 'Clothing', 'Home & Garden', 'Sports & Outdoors', 
-      'Books & Media', 'Beauty & Personal Care', 'Toys & Games',
-      'Automotive', 'Health & Wellness', 'Office Supplies'
-    ];
-    
-    const productNames = [
-      'Smartphone', 'Laptop', 'T-Shirt', 'Jeans', 'Sofa', 'Dining Table',
-      'Basketball', 'Tennis Racket', 'Novel', 'Textbook', 'Shampoo', 'Perfume',
-      'Action Figure', 'Board Game', 'Car Battery', 'Motor Oil', 'Vitamins', 'Protein Powder',
-      'Notebook', 'Pen Set', 'Headphones', 'Smart Watch', 'Jacket', 'Sneakers',
-      'Coffee Table', 'Lamp', 'Tent', 'Fishing Rod', 'Cookbook', 'DVD',
-      'Makeup Kit', 'Skincare Set', 'Lego Set', 'Puzzle', 'Tire', 'Car Wax',
-      'First Aid Kit', 'Yoga Mat', 'Stapler', 'File Folder'
-    ];
-
-    const brands = [
-      'TechCorp', 'FashionCo', 'HomeEssentials', 'SportPro', 'BookWorld',
-      'BeautyGlow', 'ToyMaster', 'AutoParts', 'HealthPlus', 'OfficePro'
-    ];
-
-    const generatedProducts = Array.from({ length: 120 }, (_, index) => {
-      const currentInventory = Math.floor(Math.random() * 200) + 10;
-      const averageSales = Math.floor(Math.random() * 50) + 5;
-      const leadTime = Math.floor(Math.random() * 14) + 3;
-      
-      // Smart reorder logic
-      const dailySales = averageSales / 7;
-      const daysOfSupply = currentInventory / dailySales;
-      const safetyStockDays = 7; // 1 week safety stock
-      const shouldReorder = daysOfSupply <= (leadTime + safetyStockDays);
-      
-      const category = categories[Math.floor(Math.random() * categories.length)];
-      const productName = productNames[Math.floor(Math.random() * productNames.length)];
-      const brand = brands[Math.floor(Math.random() * brands.length)];
-      
-      return {
-        id: index + 1,
-        name: `${brand} ${productName} ${index + 1}`,
-        currentInventory,
-        averageSales,
-        leadTime,
-        shouldReorder,
-        category,
-        daysOfSupply: Math.round(daysOfSupply),
-        urgency: shouldReorder ? (daysOfSupply < leadTime ? 'HIGH' : 'MEDIUM') : 'LOW'
-      };
-    });
-    
-    setProducts(generatedProducts);
-    calculateStats(generatedProducts);
-    setLoading(false);
-  };
-
-  // Try to fetch from API first, fallback to generated data
+  // Fetch products from API - FIXED VERSION
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      // Try multiple APIs to get real product data
-      const responses = await Promise.allSettled([
-        axios.get('https://fakestoreapi.com/products?limit=20'),
-        axios.get('https://dummyjson.com/products?limit=30'),
-        axios.get('https://api.escuelajs.co/api/v1/products?limit=30')
-      ]);
-
-      let allProducts = [];
+      setLoading(true);
+      setError(null);
       
-      responses.forEach((response, index) => {
-        if (response.status === 'fulfilled' && response.value.data) {
-          const apiProducts = Array.isArray(response.value.data) 
-            ? response.value.data 
-            : (response.value.data.products || []);
-          
-          const transformed = apiProducts.map((product, productIndex) => {
-            const currentInventory = Math.floor(Math.random() * 200) + 10;
-            const averageSales = Math.floor(Math.random() * 50) + 5;
-            const leadTime = Math.floor(Math.random() * 14) + 3;
-            const dailySales = averageSales / 7;
-            const daysOfSupply = currentInventory / dailySales;
-            const safetyStockDays = 7;
-            const shouldReorder = daysOfSupply <= (leadTime + safetyStockDays);
-
-            return {
-              id: `${index}-${productIndex}`,
-              name: product.title || product.name || `Product ${productIndex + 1}`,
-              currentInventory,
-              averageSales,
-              leadTime,
-              shouldReorder,
-              category: product.category || 'General',
-              daysOfSupply: Math.round(daysOfSupply),
-              urgency: shouldReorder ? (daysOfSupply < leadTime ? 'HIGH' : 'MEDIUM') : 'LOW'
-            };
-          });
-          
-          allProducts = [...allProducts, ...transformed];
-        }
-      });
-
-      // If we got some products from APIs, use them + generate the rest
-      if (allProducts.length > 0) {
-        const remainingCount = 120 - allProducts.length;
-        if (remainingCount > 0) {
-          const additionalProducts = Array.from({ length: remainingCount }, (_, index) => 
-            generateSingleProduct(allProducts.length + index + 1)
-          );
-          allProducts = [...allProducts, ...additionalProducts];
-        }
-        setProducts(allProducts);
-        calculateStats(allProducts);
-      } else {
-        // If all APIs failed, generate all products
-        generateProducts();
-      }
+      // Using reliable API endpoint - EXACTLY 100 PRODUCTS
+      const response = await axios.get('https://fakestoreapi.com/products?limit=100');
+      
+      // Transform API data to our format - PROPERLY STRUCTURED
+      const transformedProducts = response.data.map((product, index) => ({
+        id: product.id || index + 1,
+        name: product.title ? 
+          (product.title.length > 50 ? product.title.substring(0, 50) + '...' : product.title) 
+          : `Product ${index + 1}`,
+        currentInventory: Math.floor(Math.random() * 200) + 10,
+        averageSales: Math.floor(Math.random() * 50) + 5,
+        leadTime: Math.floor(Math.random() * 14) + 3,
+        category: product.category || 'General',
+        price: product.price || (Math.random() * 100 + 1).toFixed(2),
+        image: product.image || `https://picsum.photos/100/100?random=${index}`
+      }));
+      
+      console.log('Total products loaded:', transformedProducts.length); // Debug log
+      setProducts(transformedProducts);
     } catch (error) {
-      console.error('All APIs failed, using generated data:', error);
-      generateProducts();
+      console.error('Error fetching products:', error);
+      setError('Failed to fetch products from API. Using demo data instead.');
+      generateDummyData();
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper function to generate single product
-  const generateSingleProduct = (id) => {
-    const categories = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Beauty', 'Toys', 'Automotive', 'Health', 'Office'];
-    const productNames = ['Smartphone', 'Laptop', 'T-Shirt', 'Jeans', 'Sofa', 'Basketball', 'Novel', 'Shampoo', 'Action Figure', 'Car Battery'];
-    const brands = ['TechCorp', 'FashionCo', 'HomeEssentials', 'SportPro', 'BookWorld', 'BeautyGlow', 'ToyMaster', 'AutoParts', 'HealthPlus', 'OfficePro'];
-
-    const currentInventory = Math.floor(Math.random() * 200) + 10;
-    const averageSales = Math.floor(Math.random() * 50) + 5;
-    const leadTime = Math.floor(Math.random() * 14) + 3;
-    const dailySales = averageSales / 7;
-    const daysOfSupply = currentInventory / dailySales;
-    const safetyStockDays = 7;
-    const shouldReorder = daysOfSupply <= (leadTime + safetyStockDays);
-
-    return {
-      id,
-      name: `${brands[Math.floor(Math.random() * brands.length)]} ${productNames[Math.floor(Math.random() * productNames.length)]} ${id}`,
-      currentInventory,
-      averageSales,
-      leadTime,
-      shouldReorder,
+  // Generate dummy data if API fails - EXACTLY 100 PRODUCTS
+  const generateDummyData = () => {
+    const categories = ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books', 'Beauty', 'Toys', 'Automotive'];
+    const dummyProducts = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      name: `Product ${index + 1} - ${categories[Math.floor(Math.random() * categories.length)]}`,
+      currentInventory: Math.floor(Math.random() * 200) + 10,
+      averageSales: Math.floor(Math.random() * 50) + 5,
+      leadTime: Math.floor(Math.random() * 14) + 3,
       category: categories[Math.floor(Math.random() * categories.length)],
-      daysOfSupply: Math.round(daysOfSupply),
-      urgency: shouldReorder ? (daysOfSupply < leadTime ? 'HIGH' : 'MEDIUM') : 'LOW'
-    };
-  };
-
-  // Calculate dashboard statistics
-  const calculateStats = (products) => {
-    const total = products.length;
-    const reorder = products.filter(p => p.shouldReorder).length;
-    const ok = total - reorder;
-    const highUrgency = products.filter(p => p.urgency === 'HIGH').length;
+      price: (Math.random() * 100 + 1).toFixed(2),
+      image: `https://picsum.photos/100/100?random=${index}`
+    }));
     
-    setStats({ total, reorder, ok, highUrgency });
+    console.log('Generated dummy products:', dummyProducts.length); // Debug log
+    setProducts(dummyProducts);
   };
 
-  // Export to CSV functionality
-  const exportToCSV = () => {
-    const reorderProducts = products.filter(p => p.shouldReorder);
+  // Train model and make predictions
+  const trainAndPredict = async () => {
+    if (products.length === 0) return;
+    
+    setTraining(true);
+    setError(null);
+    try {
+      console.log('Starting model training...');
+      // Train the model
+      await predictor.trainModel(products);
+      
+      // Make predictions for each product
+      const newPredictions = {};
+      for (const product of products) {
+        try {
+          const prediction = await predictor.predict(product);
+          newPredictions[product.id] = prediction;
+        } catch (error) {
+          console.warn(`Prediction failed for product ${product.id}, using rule-based fallback`);
+          // Fallback to rule-based prediction
+          newPredictions[product.id] = {
+            shouldReorder: predictor.shouldReorder(product),
+            confidence: 0.8,
+            probability: predictor.shouldReorder(product) ? 0.7 : 0.3
+          };
+        }
+      }
+      
+      setPredictions(newPredictions);
+      console.log('Predictions completed for', Object.keys(newPredictions).length, 'products');
+    } catch (error) {
+      console.error('Error in prediction:', error);
+      setError('Prediction failed. Using rule-based recommendations.');
+      
+      // Fallback to rule-based predictions
+      const ruleBasedPredictions = {};
+      products.forEach(product => {
+        ruleBasedPredictions[product.id] = {
+          shouldReorder: predictor.shouldReorder(product),
+          confidence: 0.9,
+          probability: predictor.shouldReorder(product) ? 0.8 : 0.2
+        };
+      });
+      setPredictions(ruleBasedPredictions);
+    } finally {
+      setTraining(false);
+    }
+  };
+
+  // Export reorder list
+  const exportReorderList = () => {
+    const reorderProducts = products.filter(product => 
+      predictions[product.id]?.shouldReorder
+    );
+    
     const csvContent = [
-      ['Product ID', 'Product Name', 'Current Inventory', 'Avg Sales/Week', 'Lead Time (Days)', 'Days of Supply', 'Urgency'],
+      ['Product ID', 'Product Name', 'Current Inventory', 'Avg Sales/Week', 'Lead Time (Days)', 'Urgency'],
       ...reorderProducts.map(product => [
         product.id,
-        `"${product.name}"`,
+        product.name,
         product.currentInventory,
         product.averageSales,
         product.leadTime,
-        product.daysOfSupply,
-        product.urgency
+        predictions[product.id]?.confidence > 0.8 ? 'HIGH' : 'MEDIUM'
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -193,154 +142,188 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Show critical alerts
-  const showCriticalAlerts = () => {
-    const criticalProducts = products.filter(p => p.urgency === 'HIGH');
-    if (criticalProducts.length === 0) {
-      alert('✅ No critical products found! Inventory is well-stocked.');
+  // Send critical alerts
+  const sendCriticalAlerts = () => {
+    const criticalProducts = products.filter(product => {
+      const weeksOfSupply = product.currentInventory / (product.averageSales / 7);
+      return weeksOfSupply < product.leadTime / 7;
+    });
+
+    if (criticalProducts.length > 0) {
+      alert(`🚨 CRITICAL ALERT!\n\n${criticalProducts.length} products need immediate attention!\n\nThey will run out of stock before the next delivery.`);
     } else {
-      const productNames = criticalProducts.map(p => p.name).join('\n• ');
-      alert(`🚨 CRITICAL ALERT: ${criticalProducts.length} products need immediate attention!\n\n• ${productNames}\n\nThese will run out before the next delivery!`);
+      alert('✅ No critical products found. Inventory levels are healthy.');
     }
   };
 
+  // Initialize app
   useEffect(() => {
-    fetchProducts();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Using reliable API endpoint - EXACTLY 100 PRODUCTS
+        const response = await axios.get('https://fakestoreapi.com/products?limit=100');
+        
+        // Transform API data to our format
+        const transformedProducts = response.data.map((product, index) => ({
+          id: product.id || index + 1,
+          name: product.title ? 
+            (product.title.length > 50 ? product.title.substring(0, 50) + '...' : product.title) 
+            : `Product ${index + 1}`,
+          currentInventory: Math.floor(Math.random() * 200) + 10,
+          averageSales: Math.floor(Math.random() * 50) + 5,
+          leadTime: Math.floor(Math.random() * 14) + 3,
+          category: product.category || 'General',
+          price: product.price || (Math.random() * 100 + 1).toFixed(2),
+          image: product.image || `https://picsum.photos/100/100?random=${index}`
+        }));
+        
+        setProducts(transformedProducts);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setError('Failed to fetch products from API. Using demo data instead.');
+        generateDummyData();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="loading">
-        <h2>🔄 Loading Inventory Data...</h2>
-        <p>Fetching 120 products from multiple sources</p>
-        <div className="loading-bar">
-          <div className="loading-progress"></div>
-        </div>
-      </div>
-    );
-  }
+  // Train model when products are loaded
+  useEffect(() => {
+    const runPredictions = async () => {
+      if (products.length === 0) return;
+      
+      setTraining(true);
+      setError(null);
+      try {
+        // Train the model
+        await predictor.trainModel(products);
+        
+        // Make predictions for each product
+        const newPredictions = {};
+        for (const product of products) {
+          try {
+            const prediction = await predictor.predict(product);
+            newPredictions[product.id] = prediction;
+          } catch (error) {
+            console.warn(`Prediction failed for product ${product.id}, using rule-based fallback`);
+            // Fallback to rule-based prediction
+            newPredictions[product.id] = {
+              shouldReorder: predictor.shouldReorder(product),
+              confidence: 0.8,
+              probability: predictor.shouldReorder(product) ? 0.7 : 0.3
+            };
+          }
+        }
+        
+        setPredictions(newPredictions);
+      } catch (error) {
+        console.error('Error in prediction:', error);
+        setError('Prediction failed. Using rule-based recommendations.');
+        
+        // Fallback to rule-based predictions
+        const ruleBasedPredictions = {};
+        products.forEach(product => {
+          ruleBasedPredictions[product.id] = {
+            shouldReorder: predictor.shouldReorder(product),
+            confidence: 0.9,
+            probability: predictor.shouldReorder(product) ? 0.8 : 0.2
+          };
+        });
+        setPredictions(ruleBasedPredictions);
+      } finally {
+        setTraining(false);
+      }
+    };
+
+    runPredictions();
+  }, [products, predictor]);
 
   return (
     <div className="App">
       <header className="app-header">
-        <h1>📦 Inventory Reorder Predictor</h1>
-        <p>Smart inventory management system • {products.length} Products Loaded</p>
+        <div className="header-content">
+          <h1>🏭 Inventory Reorder Predictor</h1>
+          <p>Smart inventory management system with predictive analytics</p>
+          <div className="header-badges">
+            <span className="badge realtime">Real-time</span>
+            <span className="badge predictive">Predictive Analytics</span>
+            <span className="badge inventory">100 Products</span>
+          </div>
+        </div>
       </header>
 
       <main className="app-main">
-        {/* Dashboard */}
-        <div className="dashboard">
-          <h2>📊 Dashboard Overview</h2>
-          <div className="stats">
-            <div className="stat-card total">
-              <h3>Total Products</h3>
-              <div className="stat-number">{stats.total}</div>
-              <div className="stat-desc">Items in inventory</div>
-            </div>
-            <div className="stat-card reorder">
-              <h3>Need Reorder</h3>
-              <div className="stat-number">{stats.reorder}</div>
-              <div className="stat-percent">
-                {((stats.reorder / stats.total) * 100).toFixed(1)}%
-              </div>
-              <div className="stat-desc">Require attention</div>
-            </div>
-            <div className="stat-card ok">
-              <h3>Inventory OK</h3>
-              <div className="stat-number">{stats.ok}</div>
-              <div className="stat-percent">
-                {((stats.ok / stats.total) * 100).toFixed(1)}%
-              </div>
-              <div className="stat-desc">Adequate stock</div>
-            </div>
-            <div className="stat-card critical">
-              <h3>Critical Items</h3>
-              <div className="stat-number">{stats.highUrgency || 0}</div>
-              <div className="stat-desc">Immediate action needed</div>
-            </div>
+        {error && (
+          <div className="error-banner">
+            ⚠️ {error}
           </div>
+        )}
 
-          <div className="dashboard-actions">
-            <button onClick={fetchProducts} className="btn refresh">
-              🔄 Refresh Data ({products.length} products)
-            </button>
-            <button onClick={exportToCSV} className="btn export">
-              📊 Export Reorder List
-            </button>
-            <button onClick={showCriticalAlerts} className="btn alert">
-              🚨 Critical Alerts
-            </button>
-          </div>
+        <Dashboard products={products} predictions={predictions} />
+        
+        <PredictionChart products={products} predictions={predictions} />
+
+        <div className="controls">
+          <button 
+            onClick={fetchProducts} 
+            disabled={loading}
+            className="btn-refresh"
+          >
+            {loading ? '⏳ Loading...' : '🔄 Refresh Data'}
+          </button>
+          
+          <button 
+            onClick={trainAndPredict} 
+            disabled={training || products.length === 0}
+            className="btn-predict"
+          >
+            {training ? '🔄 Processing...' : '🔮 Update Predictions'}
+          </button>
+
+          <button 
+            onClick={exportReorderList}
+            disabled={Object.keys(predictions).length === 0}
+            className="btn-export"
+          >
+            📊 Export Reorder List
+          </button>
+
+          <button 
+            onClick={sendCriticalAlerts}
+            disabled={products.length === 0}
+            className="btn-alert"
+          >
+            🚨 Critical Alerts
+          </button>
         </div>
 
-        {/* Products Table */}
-        <div className="products-table">
-          <h2>🛍️ Product Inventory & Reorder Recommendations</h2>
-          <p className="table-info">
-            Showing {products.length} products • {products.filter(p => p.shouldReorder).length} need reorder
-          </p>
-          
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Product Name</th>
-                  <th>Category</th>
-                  <th>Current Inventory</th>
-                  <th>Avg Sales/Week</th>
-                  <th>Lead Time (Days)</th>
-                  <th>Days of Supply</th>
-                  <th>Reorder Recommendation</th>
-                  <th>Urgency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map(product => (
-                  <tr key={product.id} className={`${product.shouldReorder ? 'reorder' : ''} ${product.urgency === 'HIGH' ? 'critical' : ''}`}>
-                    <td className="product-id">#{product.id}</td>
-                    <td className="product-name">{product.name}</td>
-                    <td className="product-category">{product.category}</td>
-                    <td className="inventory">{product.currentInventory}</td>
-                    <td className="sales">{product.averageSales}</td>
-                    <td className="lead-time">{product.leadTime}</td>
-                    <td className="supply-days">{product.daysOfSupply}</td>
-                    <td>
-                      <span className={`status ${product.shouldReorder ? 'reorder' : 'ok'}`}>
-                        {product.shouldReorder ? '🔄 REORDER' : '✅ OK'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`urgency ${product.urgency.toLowerCase()}`}>
-                        {product.urgency}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="table-footer">
-            <p>
-              <strong>Inventory Analysis:</strong> {products.filter(p => p.shouldReorder).length} products need reordering. 
-              {products.filter(p => p.urgency === 'HIGH').length > 0 && 
-                ` ${products.filter(p => p.urgency === 'HIGH').length} require immediate attention.`
-              }
-            </p>
-          </div>
-        </div>
+        <ProductTable 
+          products={products} 
+          predictions={predictions}
+          loading={loading}
+        />
       </main>
 
       <footer className="app-footer">
-        <p>Inventory Management System • {products.length} Products • Built with React</p>
+        <div className="footer-content">
+          <p>
+            <strong>Inventory Reorder Predictor</strong> | 
+            Built with React & Predictive Analytics | 
+            Smart Inventory Management
+          </p>
+          <div className="tech-stack">
+            <span>Tech Stack: React • Predictive Analytics • CSS3 • Axios</span>
+          </div>
+        </div>
       </footer>
     </div>
   );
 }
 
 export default App;
-
-//dadasd
-//dasdasdadad4
-//dadasdasdadasd
